@@ -1,5 +1,7 @@
 # Tic-tac-toe against Jev
 
+[![Tests](https://github.com/vilaca/jev-tic-tac-toe/actions/workflows/tests.yml/badge.svg)](https://github.com/vilaca/jev-tic-tac-toe/actions/workflows/tests.yml)
+
 A terminal tic-tac-toe game: you are X, [Jev](https://docs.typesafe.ai) is O.
 
 Jev (from TypeSafe) is a **decision model**, not a chatbot and not a game engine. On each of its turns it gets the board plus every row, column and diagonal, and one `choice` question whose options are only the empty squares, so it can never make an illegal move. After each move the game prints Jev's top probabilities. It will sometimes miss a win or a block.
