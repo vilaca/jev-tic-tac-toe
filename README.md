@@ -4,7 +4,7 @@
 
 A terminal tic-tac-toe game: you are X, [Jev](https://docs.typesafe.ai) is O.
 
-Jev (from TypeSafe) is a **decision model**, not a chatbot and not a game engine. On each of its turns it gets the board plus every row, column and diagonal, and one `choice` question whose options are only the empty squares, so it can never make an illegal move. After each move the game prints Jev's top probabilities. It will sometimes miss a win or a block.
+Jev (from TypeSafe) is a **decision model**, not a chatbot and not a game engine. On each of its turns it gets the board plus every row, column and diagonal, and one `choice` question whose options are only the empty squares, so it can never make an illegal move. After each of these moves the game prints Jev's top probabilities. When only one square is left, the game fills it for Jev without asking. Jev will sometimes miss a win or a block.
 
 ## Requirements
 
@@ -26,11 +26,13 @@ Jev's weights are not public, but [razorback16/openjev](https://github.com/razor
 
 - an Apple silicon Mac with about 16 GB of free memory
 - Python 3.10 or later
-- about 16 GB of free disk space, and internet access on the first start, to download the 4-bit weights (`mlx-community/diffusiongemma-26B-A4B-it-4bit`) from Hugging Face
+- about 17 GB of free disk space, and internet access on the first start, to download the 4-bit weights (`mlx-community/diffusiongemma-26B-A4B-it-4bit`) from Hugging Face
 
 On an NVIDIA GPU, OpenJev runs through vLLM instead. That needs a GPU with at least 24 GB of memory, Docker with GPU support (`--gpus all`) for the prebuilt `razorback16/openjev` image, which runs on CUDA 13, and about 18 GB of disk for the weights. See its README.
 
 Install it once, from this folder. The `pip install` brings in the rest: `mlx-vlm`, FastAPI, uvicorn and transformers.
+
+The venv needs Python 3.10 or later. The `python3` built into macOS is 3.9, which OpenJev rejects. If `python3 --version` says 3.9, install a newer Python (for example `brew install python@3.12`) and use `python3.12` in place of `python3` below.
 
 ```sh
 git clone https://github.com/razorback16/openjev
