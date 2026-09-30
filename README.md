@@ -6,6 +6,8 @@ A terminal tic-tac-toe game: you are X, [Jev](https://docs.typesafe.ai) is O.
 
 Jev (from TypeSafe) is a **decision model**, not a chatbot and not a game engine. On each of its turns it gets the board plus every row, column and diagonal, and one `choice` question whose options are only the empty squares, so it can never make an illegal move. After each of these moves the game prints Jev's top probabilities. When only one square is left, the game fills it for Jev without asking. Jev will sometimes miss a win or a block.
 
+![A game in progress: Jev takes the top-left corner and the game shows its move probabilities](screenshot.png)
+
 ## Requirements
 
 - Python 3. The game uses only the standard library. The tests need Python 3.11 or later.
