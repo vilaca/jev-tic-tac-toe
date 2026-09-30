@@ -5,13 +5,15 @@ On each of its turns Jev gets the board and one choice question whose options ar
 empty squares, so it can only pick a legal move. Jev is a decision model, not a game
 engine, so expect it to miss a win or a block now and then.
 
-The endpoint comes from JEV_URL, then TYPESAFE_API_KEY, then OPENROUTER_API_KEY.
-With none of them set, it uses the local OpenJev server on 127.0.0.1:8080.
+The endpoint comes from JEV_URL (with JEV_API_KEY if that server needs a key), then
+TYPESAFE_API_KEY, then OPENROUTER_API_KEY. With none of them set, it uses the local
+OpenJev server on 127.0.0.1:8080.
 """
 import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 SQUARES = {
@@ -38,6 +40,7 @@ INSTRUCTIONS = (
 TIMEOUT_S = float(os.environ.get("JEV_TIMEOUT", "30"))
 SCORE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tictactoe-score.json")
 NEW_SCORE = {"you": 0, "jev": 0, "draws": 0}
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 class JevError(Exception):
@@ -46,7 +49,7 @@ class JevError(Exception):
 
 def endpoint():
     if os.environ.get("JEV_URL"):
-        return os.environ["JEV_URL"], "local", os.environ.get("JEV_MODEL", "jev-latest")
+        return os.environ["JEV_URL"], os.environ.get("JEV_API_KEY", "local"), os.environ.get("JEV_MODEL", "jev-latest")
     if os.environ.get("TYPESAFE_API_KEY"):
         return "https://api.typesafe.ai/v1/systemone", os.environ["TYPESAFE_API_KEY"], "jev-latest"
     if os.environ.get("OPENROUTER_API_KEY"):
@@ -99,11 +102,20 @@ def jev_move(board, empty):
     return move, answer
 
 
+def is_number(value):
+    return isinstance(value, (int, float))
+
+
 def describe(move, answer):
-    top = sorted(answer.get("probabilities", {}).items(), key=lambda item: item[1], reverse=True)[:3]
+    # Only the move is checked in jev_move(), so skip any extra field that isn't a number.
+    probabilities = answer.get("probabilities")
+    if not isinstance(probabilities, dict):
+        probabilities = {}
+    numbers = {square: p for square, p in probabilities.items() if is_number(p)}
+    top = sorted(numbers.items(), key=lambda item: item[1], reverse=True)[:3]
     odds = ", ".join(f"{square}: {p:.2f}" for square, p in top)
     confidence = answer.get("confidence")
-    confidence_text = f", confidence {confidence:.2f}" if confidence is not None else ""
+    confidence_text = f", confidence {confidence:.2f}" if is_number(confidence) else ""
     odds_text = f"; {odds}" if odds else ""
     return f"Jev plays {move} ({SQUARES[move]}{confidence_text}{odds_text})"
 
@@ -161,9 +173,13 @@ def play(first, score):
 def load_score():
     try:
         with open(SCORE_PATH) as f:
-            return {**NEW_SCORE, **json.load(f)}
-    except (OSError, ValueError, TypeError):  # missing or unreadable file starts from zero
-        return dict(NEW_SCORE)
+            saved = json.load(f)
+    except (OSError, ValueError):  # missing or unreadable file starts from zero
+        saved = {}
+    if not isinstance(saved, dict):
+        saved = {}
+    # So does any count that isn't a whole number.
+    return {key: saved[key] if isinstance(saved.get(key), int) else 0 for key in NEW_SCORE}
 
 
 def save_score(score):
@@ -191,10 +207,11 @@ def main():
     except JevError as e:
         sys.exit(f"\nBad answer from Jev at {endpoint()[0]}: {e}")
     except OSError as e:
-        url, key, _ = endpoint()
+        url = endpoint()[0]
         hint = ("\nStart the local server first: cd openjev && OPENJEV_BACKEND=mlx ../.venv/bin/python -m openjev\n"
                 "No openjev/ folder? Get it from https://github.com/razorback16/openjev (setup steps in README.md).")
-        sys.exit(f"\nCould not reach Jev at {url}: {e}{hint if key == 'local' else ''}")
+        is_local = urllib.parse.urlsplit(url).hostname in LOCAL_HOSTS
+        sys.exit(f"\nCould not reach Jev at {url}: {e}{hint if is_local else ''}")
 
 
 if __name__ == "__main__":

@@ -89,6 +89,19 @@ class DescribeTest(unittest.TestCase):
     def test_without_confidence_or_probabilities(self):
         self.assertEqual(tictactoe.describe(5, {}), "Jev plays 5 (center)")
 
+    def test_skips_fields_that_are_not_numbers(self):
+        for answer in (
+            {"probabilities": None, "confidence": None},
+            {"probabilities": [0.9], "confidence": "0.9"},
+            {"probabilities": {"1": None, "3": "0.5"}},
+        ):
+            with self.subTest(answer):
+                self.assertEqual(tictactoe.describe(5, answer), "Jev plays 5 (center)")
+
+    def test_keeps_the_probabilities_that_are_numbers(self):
+        answer = {"probabilities": {"1": 0.7, "3": None, "9": 0.2}}
+        self.assertEqual(tictactoe.describe(1, answer), "Jev plays 1 (top-left corner; 1: 0.70, 9: 0.20)")
+
 
 class AskMoveTest(GameTestCase):
     def ask(self, *texts, layout="........."):
@@ -149,6 +162,12 @@ class EndpointTest(unittest.TestCase):
             ("http://jev", "local", "m"),
         )
 
+    def test_jev_api_key_goes_with_jev_url(self):
+        self.assertEqual(
+            self.endpoint(JEV_URL="https://jev", JEV_API_KEY="k", TYPESAFE_API_KEY="t"),
+            ("https://jev", "k", "jev-latest"),
+        )
+
     def test_typesafe_before_openrouter(self):
         self.assertEqual(
             self.endpoint(TYPESAFE_API_KEY="t", OPENROUTER_API_KEY="o"),
@@ -187,6 +206,18 @@ class ScoreFileTest(GameTestCase):
         self.write('{"you": 4}')
         self.assertEqual(tictactoe.load_score(), {"you": 4, "jev": 0, "draws": 0})
 
+    def test_counts_that_are_not_whole_numbers_start_from_zero(self):
+        self.write('{"you": null, "jev": "3", "draws": 2.5, "extra": 1}')
+        self.assertEqual(tictactoe.load_score(), tictactoe.NEW_SCORE)
+
+    def test_a_bad_count_is_replaced_after_the_next_game(self):
+        self.write('{"you": null, "jev": 2}')
+        self.type_in("1", "2", "3", "n")
+        self.enterContext(mock.patch.object(tictactoe, "jev_move", side_effect=[(4, {}), (5, {})]))
+        tictactoe.main()
+        with open(self.score_path) as f:
+            self.assertEqual(json.load(f), {"you": 1, "jev": 2, "draws": 0})
+
 
 class PlayTest(GameTestCase):
     def play(self, first, your_moves, jev_moves):
@@ -220,9 +251,9 @@ class PlayTest(GameTestCase):
 class MainErrorTest(GameTestCase):
     """You play 5, then Jev's turn fails."""
 
-    def run_main(self, key="local", **urlopen):
+    def run_main(self, url=URL, key="local", **urlopen):
         self.type_in("5")
-        self.enterContext(mock.patch.object(tictactoe, "endpoint", return_value=(URL, key, "jev-latest")))
+        self.enterContext(mock.patch.object(tictactoe, "endpoint", return_value=(url, key, "jev-latest")))
         self.enterContext(mock.patch("urllib.request.urlopen", **urlopen))
         with self.assertRaises(SystemExit) as exit_:
             tictactoe.main()
@@ -240,14 +271,20 @@ class MainErrorTest(GameTestCase):
         self.assertIn("it picked 5, which is not an empty square", message)
 
     def test_unreachable_local_server_shows_how_to_start_it(self):
-        message = self.run_main(side_effect=urllib.error.URLError(ConnectionRefusedError(61, "Connection refused")))
-        self.assertIn(f"Could not reach Jev at {URL}", message)
-        self.assertIn(LOCAL_HINT, message)
+        refused = urllib.error.URLError(ConnectionRefusedError(61, "Connection refused"))
+        for url in (URL, "http://localhost:9000/v1/systemone"):
+            with self.subTest(url):
+                message = self.run_main(url=url, side_effect=refused)
+                self.assertIn(f"Could not reach Jev at {url}", message)
+                self.assertIn(LOCAL_HINT, message)
 
-    def test_unreachable_hosted_server_has_no_local_hint(self):
-        message = self.run_main(key="sk-test", side_effect=TimeoutError("timed out"))
-        self.assertIn(f"Could not reach Jev at {URL}: timed out", message)
-        self.assertNotIn(LOCAL_HINT, message)
+    def test_unreachable_remote_server_has_no_local_hint(self):
+        # A hosted API with its key, and a remote server set with JEV_URL and no JEV_API_KEY.
+        for url, key in (("https://api.typesafe.ai/v1/systemone", "sk-test"), ("https://jev.example.com/v1", "local")):
+            with self.subTest(url):
+                message = self.run_main(url=url, key=key, side_effect=TimeoutError("timed out"))
+                self.assertIn(f"Could not reach Jev at {url}: timed out", message)
+                self.assertNotIn(LOCAL_HINT, message)
 
     def test_score_file_is_not_written_when_a_game_fails(self):
         self.run_main(side_effect=TimeoutError("timed out"))

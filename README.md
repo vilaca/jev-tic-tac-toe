@@ -40,6 +40,8 @@ python3 -m venv .venv
 .venv/bin/pip install -e './openjev[mlx]'
 ```
 
+Install it from the clone as above, not with `pip install openjev`. The `openjev` package on PyPI is an unrelated project ([balys/openjev](https://github.com/balys/openjev)). There is no Homebrew formula either, and OpenJev defines no command, so `pipx` and `uv tool install` don't work for it.
+
 Then start the server. The first start downloads the weights into `~/.cache/huggingface`.
 
 ```sh
@@ -52,7 +54,7 @@ Start it from inside `openjev/`. From this folder, Python picks up the cloned fo
 
 The first match wins:
 
-1. `JEV_URL`: any Jev-compatible server, e.g. `http://127.0.0.1:8080/v1/systemone`. `JEV_MODEL` sets the model name (default `jev-latest`).
+1. `JEV_URL`: any Jev-compatible server, e.g. `http://127.0.0.1:8080/v1/systemone`. `JEV_MODEL` sets the model name (default `jev-latest`), and `JEV_API_KEY` its key, if that server needs one.
 2. `TYPESAFE_API_KEY`
 3. `OPENROUTER_API_KEY`
 4. Nothing set: OpenJev on `127.0.0.1:8080`.
